@@ -146,6 +146,17 @@ enum ProcessRunnerError: Error {
     case invalidCommand
 }
 
+extension ProcessRunnerError: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case let .failed(exitCode, stdout, stderr, command):
+            return "\(command.first ?? "process") failed with exit code \(exitCode); stdout: \(stdout); stderr: \(stderr)"
+        case .invalidCommand:
+            return "invalid command"
+        }
+    }
+}
+
 protocol ProcessRunning: Sendable {
     func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult?
     func start(executable: String, arguments: [String]) throws -> ProcessHandle
