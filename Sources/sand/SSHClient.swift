@@ -17,14 +17,19 @@ struct SSHClient {
         "-o", "ServerAliveCountMax=6"
     ]
 
+    private var passwordEnvironment: [String: String] {
+        ["SSHPASS": config.password]
+    }
+
     func exec(command: String) async throws -> ProcessResult? {
         let escaped = command.replacingOccurrences(of: "'", with: "'\"'\"'")
         let remote = "/bin/bash -lc '\(escaped)'"
         return try await processRunner.run(
             executable: "sshpass",
-            arguments: ["-p", config.password, "ssh"]
+            arguments: ["-e", "ssh"]
                 + Self.commonOptions
                 + ["-p", String(config.port), "\(config.user)@\(host)", remote],
+            environment: passwordEnvironment,
             wait: true
         )
     }
@@ -34,18 +39,20 @@ struct SSHClient {
         let remote = "/bin/bash -lc '\(escaped)'"
         return try processRunner.start(
             executable: "sshpass",
-            arguments: ["-p", config.password, "ssh"]
+            arguments: ["-e", "ssh"]
                 + Self.commonOptions
-                + ["-p", String(config.port), "\(config.user)@\(host)", remote]
+                + ["-p", String(config.port), "\(config.user)@\(host)", remote],
+            environment: passwordEnvironment
         )
     }
 
     func copy(localPath: String, remotePath: String) async throws -> ProcessResult? {
         return try await processRunner.run(
             executable: "sshpass",
-            arguments: ["-p", config.password, "scp"]
+            arguments: ["-e", "scp"]
                 + Self.commonOptions
                 + ["-P", String(config.port), localPath, "\(config.user)@\(host):\(remotePath)"],
+            environment: passwordEnvironment,
             wait: true
         )
     }

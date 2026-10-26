@@ -158,24 +158,37 @@ extension ProcessRunnerError: CustomStringConvertible {
 }
 
 protocol ProcessRunning: Sendable {
-    func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult?
-    func start(executable: String, arguments: [String]) throws -> ProcessHandle
+    func run(executable: String, arguments: [String], environment: [String: String], wait: Bool) async throws -> ProcessResult?
+    func start(executable: String, arguments: [String], environment: [String: String]) throws -> ProcessHandle
+}
+
+extension ProcessRunning {
+    func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult? {
+        try await run(executable: executable, arguments: arguments, environment: [:], wait: wait)
+    }
+
+    func start(executable: String, arguments: [String]) throws -> ProcessHandle {
+        try start(executable: executable, arguments: arguments, environment: [:])
+    }
 }
 
 struct SystemProcessRunner: ProcessRunning, Sendable {
-    func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult? {
-        let handle = try start(executable: executable, arguments: arguments)
+    func run(executable: String, arguments: [String], environment: [String: String], wait: Bool) async throws -> ProcessResult? {
+        let handle = try start(executable: executable, arguments: arguments, environment: environment)
         guard wait else {
             return nil
         }
         return try await handle.waitAsync()
     }
 
-    func start(executable: String, arguments: [String]) throws -> ProcessHandle {
+    func start(executable: String, arguments: [String], environment: [String: String]) throws -> ProcessHandle {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         let command = [executable] + arguments
         process.arguments = command
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(environment) { $1 }
+        }
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe

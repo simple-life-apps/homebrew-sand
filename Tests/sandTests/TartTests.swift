@@ -13,7 +13,7 @@ final class MockProcessRunner: ProcessRunning, @unchecked Sendable {
     var startCalls: [Call] = []
     var startResults: [Result<ProcessResult, Error>] = []
 
-    func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult? {
+    func run(executable: String, arguments: [String], environment: [String: String], wait: Bool) async throws -> ProcessResult? {
         calls.append(Call(executable: executable, arguments: arguments, wait: wait))
         if results.isEmpty {
             return ProcessResult(stdout: "", stderr: "", exitCode: 0)
@@ -21,7 +21,7 @@ final class MockProcessRunner: ProcessRunning, @unchecked Sendable {
         return results.removeFirst()
     }
 
-    func start(executable: String, arguments: [String]) throws -> ProcessHandle {
+    func start(executable: String, arguments: [String], environment: [String: String]) throws -> ProcessHandle {
         startCalls.append(Call(executable: executable, arguments: arguments, wait: false))
         let result = startResults.isEmpty ? .success(ProcessResult(stdout: "", stderr: "", exitCode: 0)) : startResults.removeFirst()
         return ProcessHandle(

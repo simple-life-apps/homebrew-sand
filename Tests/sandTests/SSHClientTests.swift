@@ -6,18 +6,19 @@ final class SSHProcessRunner: ProcessRunning, @unchecked Sendable {
         let executable: String
         let arguments: [String]
         let wait: Bool
+        var environment: [String: String] = [:]
     }
 
     var runCalls: [Call] = []
     var startCalls: [Call] = []
 
-    func run(executable: String, arguments: [String], wait: Bool) async throws -> ProcessResult? {
-        runCalls.append(Call(executable: executable, arguments: arguments, wait: wait))
+    func run(executable: String, arguments: [String], environment: [String: String], wait: Bool) async throws -> ProcessResult? {
+        runCalls.append(Call(executable: executable, arguments: arguments, wait: wait, environment: environment))
         return ProcessResult(stdout: "", stderr: "", exitCode: 0)
     }
 
-    func start(executable: String, arguments: [String]) throws -> ProcessHandle {
-        startCalls.append(Call(executable: executable, arguments: arguments, wait: false))
+    func start(executable: String, arguments: [String], environment: [String: String]) throws -> ProcessHandle {
+        startCalls.append(Call(executable: executable, arguments: arguments, wait: false, environment: environment))
         return ProcessHandle(
             waitAsync: { ProcessResult(stdout: "", stderr: "", exitCode: 0) },
             terminate: {}
@@ -38,7 +39,7 @@ final class SSHClientTests: XCTestCase {
         let expected = SSHProcessRunner.Call(
             executable: "sshpass",
             arguments: [
-                "-p", "pw",
+                "-e",
                 "ssh",
                 "-o", "PreferredAuthentications=password",
                 "-o", "PubkeyAuthentication=no",
@@ -53,8 +54,27 @@ final class SSHClientTests: XCTestCase {
                 "admin@10.0.0.1",
                 "/bin/bash -lc 'echo hi'"
             ],
-            wait: false
+            wait: false,
+            environment: ["SSHPASS": "pw"]
         )
         XCTAssertEqual(runner.startCalls.first, expected)
+    }
+
+    func testPasswordStaysOffCommandLine() async throws {
+        let runner = SSHProcessRunner()
+        let ssh = SSHClient(
+            processRunner: runner,
+            host: "10.0.0.1",
+            config: .init(user: "admin", password: "hunter2", port: 22)
+        )
+        _ = try await ssh.exec(command: "true")
+        _ = try await ssh.copy(localPath: "/tmp/a", remotePath: "b")
+        _ = try ssh.start(command: "true")
+        let calls = runner.runCalls + runner.startCalls
+        XCTAssertEqual(calls.count, 3)
+        for call in calls {
+            XCTAssertFalse(call.arguments.contains("hunter2"))
+            XCTAssertEqual(call.environment, ["SSHPASS": "hunter2"])
+        }
     }
 }
