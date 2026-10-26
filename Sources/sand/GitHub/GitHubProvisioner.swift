@@ -93,6 +93,11 @@ struct GitHubProvisionerConfig: Decodable, Sendable {
 struct ProvisionerScript {
     let setup: [String]
     let run: String
+    var secrets: [String] = []
+
+    func redact(_ command: String) -> String {
+        secrets.filter { !$0.isEmpty }.reduce(command) { $0.replacingOccurrences(of: $1, with: "***") }
+    }
 }
 
 struct GitHubProvisioner: Sendable {
@@ -114,7 +119,8 @@ struct GitHubProvisioner: Sendable {
                 "~/actions-runner/config.sh --url \(url) --name \(runnerName) --token \(runnerToken) --ephemeral --unattended --replace --labels \(labels)\(runnerGroupArg)",
                 "echo \"Runner configured, starting ~/actions-runner/run.sh\""
             ],
-            run: "~/actions-runner/run.sh"
+            run: "~/actions-runner/run.sh",
+            secrets: [runnerToken]
         )
     }
 

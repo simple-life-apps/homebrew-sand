@@ -96,4 +96,28 @@ final class GitHubProvisionerTests: XCTestCase {
         let script = provisioner.script(config: config, runnerToken: "token", runnerName: "runner-1-a3f9c")
         XCTAssertTrue(script.setup.joined(separator: "\n").contains("--name runner-1-a3f9c"))
     }
+
+    func testRedactHidesRunnerToken() {
+        let provisioner = GitHubProvisioner()
+        let config = GitHubProvisionerConfig(
+            appId: 1,
+            organization: "org",
+            repository: nil,
+            privateKeyPath: "/tmp/key.pem",
+            runnerName: "runner-1",
+            extraLabels: nil,
+            runnerGroup: nil
+        )
+        let script = provisioner.script(config: config, runnerToken: "AABBSECRET", runnerName: config.runnerName)
+        let configure = script.setup.first { $0.contains("config.sh") } ?? ""
+        XCTAssertTrue(configure.contains("--token AABBSECRET"))
+        let redacted = script.redact(configure)
+        XCTAssertFalse(redacted.contains("AABBSECRET"))
+        XCTAssertTrue(redacted.contains("--token ***"))
+    }
+
+    func testRedactIgnoresEmptySecret() {
+        let script = ProvisionerScript(setup: [], run: "run.sh", secrets: [""])
+        XCTAssertEqual(script.redact("echo hi"), "echo hi")
+    }
 }

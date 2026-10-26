@@ -217,7 +217,7 @@ struct Runner: Sendable {
                 let cacheManager = RunnerCacheManager(cacheDirectory: runnerCacheHostPath, logger: logger)
                 try await preseedRunner(cacheManager: cacheManager, ssh: ssh)
                 let script = provisioner.script(config: githubConfig, runnerToken: token, runnerName: uniqueRunnerName)
-                let setupOutcome = await runProvisionerCommands(script.setup, ssh: ssh, monitorState: monitorState)
+                let setupOutcome = await runProvisionerCommands(script.setup, ssh: ssh, monitorState: monitorState, redact: script.redact)
                 guard try await finishStage(setupOutcome, healthCheckTask: healthCheckTask, monitorState: monitorState) else {
                     return
                 }
@@ -234,7 +234,7 @@ struct Runner: Sendable {
                     logger.info("offline monitor disabled (recycleAfterOffline: 0)")
                 }
                 let outcome = await Self.withOfflineMonitor(monitor) {
-                    await runProvisionerCommands([script.run], ssh: ssh, monitorState: monitorState)
+                    await runProvisionerCommands([script.run], ssh: ssh, monitorState: monitorState, redact: script.redact)
                 }
                 guard try await finishStage(outcome, healthCheckTask: healthCheckTask, monitorState: monitorState) else {
                     return
@@ -699,10 +699,11 @@ struct Runner: Sendable {
     private func runProvisionerCommands(
         _ commands: [String],
         ssh: SSHClient,
-        monitorState: MonitorFailureState
+        monitorState: MonitorFailureState,
+        redact: (String) -> String = { $0 }
     ) async -> ProvisionerOutcome<Void> {
         for command in commands {
-            let outcome = await runProvisionerCommand(command, ssh: ssh, monitorState: monitorState)
+            let outcome = await runProvisionerCommand(command, ssh: ssh, monitorState: monitorState, redact: redact)
             switch outcome {
             case .completed:
                 continue
@@ -718,13 +719,14 @@ struct Runner: Sendable {
     private func runProvisionerCommand(
         _ command: String,
         ssh: SSHClient,
-        monitorState: MonitorFailureState
+        monitorState: MonitorFailureState,
+        redact: (String) -> String
     ) async -> ProvisionerOutcome<ProcessResult> {
-        logScript(command)
+        logScript(redact(command))
+        let commandLabel = commandSummary(redact(command))
         var attempt = 0
         while true {
             do {
-                let commandLabel = commandSummary(command)
                 let labeledCommand = commandLabel.isEmpty ? "provisioner command" : "provisioner command (\(commandLabel))"
                 logger.debug("\(labeledCommand) starting (attempt \(attempt + 1))")
                 let handle = try ssh.start(command: command)
