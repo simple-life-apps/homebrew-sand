@@ -344,7 +344,9 @@ struct Runner: Sendable {
             .map { "\($0)/actions-runner.tar.gz" } ?? "actions-runner.tar.gz"
         logger.info("runner preseed: \(localPath) -> \(remotePath)")
         do {
-            _ = try await ssh.copy(localPath: localPath, remotePath: remotePath)
+            _ = try await withSSHRetry(stage: "runner preseed") {
+                try await ssh.copy(localPath: localPath, remotePath: remotePath)
+            }
         } catch {
             logger.error("runner preseed failed: \(String(describing: error))")
             throw RunnerError.runnerPreseedFailed(String(describing: error))
@@ -378,7 +380,7 @@ struct Runner: Sendable {
 
     private func probeGuestPlatform(ssh: SSHClient) async -> (os: String, arch: String)? {
         do {
-            guard let result = try await ssh.exec(command: "uname -s; uname -m") else {
+            guard let result = try await execWithRetry(command: "uname -s; uname -m", ssh: ssh, stage: "runner preseed") else {
                 return nil
             }
             let lines = result.stdout
@@ -397,7 +399,7 @@ struct Runner: Sendable {
 
     private func resolveRemoteHome(ssh: SSHClient) async -> String? {
         do {
-            guard let result = try await ssh.exec(command: "printf %s \"$HOME\"") else {
+            guard let result = try await execWithRetry(command: "printf %s \"$HOME\"", ssh: ssh, stage: "runner preseed") else {
                 return nil
             }
             let home = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -839,10 +841,16 @@ struct Runner: Sendable {
     }
 
     private func execWithRetry(command: String, ssh: SSHClient, stage: String) async throws -> ProcessResult? {
+        try await withSSHRetry(stage: stage) {
+            try await ssh.exec(command: command)
+        }
+    }
+
+    private func withSSHRetry<T>(stage: String, _ operation: () async throws -> T) async throws -> T {
         var attempt = 0
         while true {
             do {
-                return try await ssh.exec(command: command)
+                return try await operation()
             } catch {
                 if await retrySSHIfNeeded(error: error, stage: stage, attempt: &attempt) {
                     continue
