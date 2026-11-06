@@ -904,7 +904,7 @@ struct Runner: Sendable {
             guard exitCode == 255 else {
                 return false
             }
-            return command.first == "sshpass"
+            return command.first == "ssh" || command.first == "scp"
         case .invalidCommand:
             return false
         }

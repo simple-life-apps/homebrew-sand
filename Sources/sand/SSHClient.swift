@@ -4,6 +4,7 @@ struct SSHClient {
     let processRunner: ProcessRunning
     let host: String
     let config: Config.SSH
+    var askpassPath: String = SSHAskpass.defaultPath
 
     private static let commonOptions: [String] = [
         "-o", "PreferredAuthentications=password",
@@ -17,19 +18,19 @@ struct SSHClient {
         "-o", "ServerAliveCountMax=6"
     ]
 
-    private var passwordEnvironment: [String: String] {
-        ["SSHPASS": config.password]
+    private func passwordEnvironment() throws -> [String: String] {
+        try SSHAskpass.ensureScript(at: askpassPath)
+        return SSHAskpass.environment(password: config.password, path: askpassPath)
     }
 
     func exec(command: String) async throws -> ProcessResult? {
         let escaped = command.replacingOccurrences(of: "'", with: "'\"'\"'")
         let remote = "/bin/bash -lc '\(escaped)'"
         return try await processRunner.run(
-            executable: "sshpass",
-            arguments: ["-e", "ssh"]
-                + Self.commonOptions
+            executable: "ssh",
+            arguments: Self.commonOptions
                 + ["-p", String(config.port), "\(config.user)@\(host)", remote],
-            environment: passwordEnvironment,
+            environment: try passwordEnvironment(),
             wait: true
         )
     }
@@ -38,21 +39,19 @@ struct SSHClient {
         let escaped = command.replacingOccurrences(of: "'", with: "'\"'\"'")
         let remote = "/bin/bash -lc '\(escaped)'"
         return try processRunner.start(
-            executable: "sshpass",
-            arguments: ["-e", "ssh"]
-                + Self.commonOptions
+            executable: "ssh",
+            arguments: Self.commonOptions
                 + ["-p", String(config.port), "\(config.user)@\(host)", remote],
-            environment: passwordEnvironment
+            environment: try passwordEnvironment()
         )
     }
 
     func copy(localPath: String, remotePath: String) async throws -> ProcessResult? {
         return try await processRunner.run(
-            executable: "sshpass",
-            arguments: ["-e", "scp"]
-                + Self.commonOptions
+            executable: "scp",
+            arguments: Self.commonOptions
                 + ["-P", String(config.port), localPath, "\(config.user)@\(host):\(remotePath)"],
-            environment: passwordEnvironment,
+            environment: try passwordEnvironment(),
             wait: true
         )
     }

@@ -35,7 +35,7 @@ struct Doctor: AsyncParsableCommand {
 
     private func collectIssues(_ report: (String) -> Void) async -> [ConfigValidationIssue] {
         var issues: [ConfigValidationIssue] = []
-        let dependencies = ["tart", "sshpass", "ssh"]
+        let dependencies = ["tart", "ssh", "scp"]
         report("sand doctor checks:")
         report("- dependencies: \(dependencies.joined(separator: ", "))")
         let missing = DependencyChecker.missingCommands(dependencies)

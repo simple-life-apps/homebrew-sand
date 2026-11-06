@@ -24,7 +24,7 @@ struct Run: AsyncParsableCommand {
         let logSink = try logLevel.makeLogFileSink()
         let logger = Logger(label: "sand", minimumLevel: level, sink: logSink)
         logger.info("=== sand run start ===")
-        let requiredDependencies = dryRun ? ["tart"] : ["tart", "sshpass", "ssh"]
+        let requiredDependencies = dryRun ? ["tart"] : ["tart", "ssh", "scp"]
         let missing = DependencyChecker.missingCommands(requiredDependencies)
         if !missing.isEmpty {
             throw ValidationError("Missing required dependencies in PATH: \(missing.joined(separator: ", ")). Install them and re-run.")

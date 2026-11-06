@@ -7,7 +7,6 @@ class Sand < Formula
 
   depends_on "openai/tools/tart"
   depends_on :macos
-  depends_on "sshpass"
 
   def install
     # Avoid requiring SSH credentials during SwiftPM dependency fetches.
