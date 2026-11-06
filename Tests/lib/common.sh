@@ -113,7 +113,6 @@ ensure_e2e_deps() {
   require_file "$SAND_BIN"
   require_cmd tart
   require_cmd ssh
-  require_cmd sshpass
   require_cmd python3
 }
 
@@ -293,10 +292,24 @@ vm_ip() {
   tart ip "$name" --wait "$SAND_E2E_IP_WAIT_SEC"
 }
 
+ssh_askpass_path() {
+  local dir="${TMPDIR:-/tmp}/sand-e2e-$(id -u)"
+  local path="$dir/ssh-askpass"
+  if [ ! -x "$path" ]; then
+    mkdir -p -m 700 "$dir"
+    printf '#!/bin/sh\nprintf '"'"'%%s\\n'"'"' "$SAND_E2E_SSH_PASSWORD"\n' > "$path.$$"
+    chmod 700 "$path.$$"
+    mv -f "$path.$$" "$path"
+  fi
+  printf '%s\n' "$path"
+}
+
 ssh_exec() {
   local ip="$1"
   shift
-  sshpass -p "$SAND_E2E_SSH_PASSWORD" ssh \
+  SSH_ASKPASS="$(ssh_askpass_path)" SSH_ASKPASS_REQUIRE=force ssh \
+    -o PreferredAuthentications=password \
+    -o PubkeyAuthentication=no \
     -o ConnectTimeout=5 \
     -o LogLevel=ERROR \
     -o StrictHostKeyChecking=no \

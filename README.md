@@ -38,7 +38,7 @@ To run the local bash e2e tests (no CI):
 ./Tests/run
 ```
 
-These tests spin up real VMs and require `tart`, `ssh`, and `sshpass` on your machine. See `Tests/README.md` for environment overrides (image, timeout, SSH creds, etc).
+These tests spin up real VMs and require `tart` and `ssh` on your machine. See `Tests/README.md` for environment overrides (image, timeout, SSH creds, etc).
 
 ## Start up on boot
 
